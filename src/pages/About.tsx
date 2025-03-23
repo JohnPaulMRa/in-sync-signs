@@ -1,8 +1,6 @@
-
 import React from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Award, Heart, BarChart, RefreshCw, MessageSquare, HandMetal } from 'lucide-react';
 
 const About: React.FC = () => {
@@ -198,8 +196,6 @@ const About: React.FC = () => {
           </div>
         </section>
       </main>
-
-      <Footer />
     </div>
   );
 };

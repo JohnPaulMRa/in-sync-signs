@@ -1,9 +1,7 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Camera, CameraOff, Copy, Volume2, Check, RotateCcw, PauseCircle, Play, Loader } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Button } from '@/components/ui/button';
 import { toast } from "sonner";
 
@@ -18,7 +16,6 @@ const Translate: React.FC = () => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
-  // Start webcam feed
   const startWebcam = async () => {
     setIsLoading(true);
     setCameraError(null);
@@ -38,7 +35,6 @@ const Translate: React.FC = () => {
         setWebcamActive(true);
         setIsPaused(false);
         toast.success("Camera connected successfully");
-        // In a real app, this is where you would start the sign language detection
         simulateTranslation();
       }
     } catch (err) {
@@ -55,7 +51,6 @@ const Translate: React.FC = () => {
     }
   };
 
-  // Stop webcam feed
   const stopWebcam = () => {
     if (streamRef.current) {
       streamRef.current.getTracks().forEach(track => {
@@ -68,7 +63,6 @@ const Translate: React.FC = () => {
     }
   };
 
-  // Toggle pause/resume
   const togglePause = () => {
     setIsPaused(!isPaused);
     if (videoRef.current) {
@@ -82,7 +76,6 @@ const Translate: React.FC = () => {
     }
   };
 
-  // Copy text to clipboard
   const copyToClipboard = () => {
     if (translatedText) {
       navigator.clipboard.writeText(translatedText)
@@ -98,7 +91,6 @@ const Translate: React.FC = () => {
     }
   };
 
-  // Text-to-speech function
   const speakText = () => {
     if (translatedText && 'speechSynthesis' in window) {
       const utterance = new SpeechSynthesisUtterance(translatedText);
@@ -107,13 +99,11 @@ const Translate: React.FC = () => {
     }
   };
 
-  // Reset the translation
   const resetTranslation = () => {
     setTranslatedText('');
     toast.info("Translation reset");
   };
 
-  // Simulate translation (in a real app, this would be replaced with actual ML model)
   const simulateTranslation = () => {
     const phrases = [
       "Hello, how are you?",
@@ -143,7 +133,6 @@ const Translate: React.FC = () => {
     return () => clearInterval(interval);
   };
 
-  // Clean up on unmount
   useEffect(() => {
     return () => {
       stopWebcam();
@@ -167,7 +156,6 @@ const Translate: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
-              {/* Webcam Display */}
               <div className="animate-fade-in">
                 <div className="rounded-2xl overflow-hidden border bg-muted/30 shadow-lg aspect-video relative">
                   {webcamActive ? (
@@ -206,7 +194,6 @@ const Translate: React.FC = () => {
                     </div>
                   )}
 
-                  {/* Camera controls overlay */}
                   {webcamActive && (
                     <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-3">
                       <Button 
@@ -232,7 +219,6 @@ const Translate: React.FC = () => {
                 </div>
               </div>
 
-              {/* Text Output */}
               <div className="animate-fade-in">
                 <div className="rounded-2xl border bg-background h-full shadow-lg flex flex-col">
                   <div className="p-4 border-b flex justify-between items-center">
@@ -287,7 +273,6 @@ const Translate: React.FC = () => {
               </div>
             </div>
 
-            {/* Instructions */}
             <div className="bg-muted/30 rounded-2xl p-6 border animate-fade-in">
               <h2 className="text-xl font-semibold mb-4">How to use the translator</h2>
               <ol className="space-y-3 list-decimal pl-5">
@@ -306,8 +291,6 @@ const Translate: React.FC = () => {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 };

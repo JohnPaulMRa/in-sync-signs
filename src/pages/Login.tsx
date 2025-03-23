@@ -1,9 +1,7 @@
-
 import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTheme } from '@/components/ThemeProvider';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { Eye, EyeOff, LogIn } from 'lucide-react';
 
 const Login: React.FC = () => {
@@ -150,8 +148,6 @@ const Login: React.FC = () => {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 };

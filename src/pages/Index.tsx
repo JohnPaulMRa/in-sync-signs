@@ -1,10 +1,8 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Mic, Video, BookOpen, Activity, ChevronRight, Hand, MessageSquare, Brain } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 
 const Index: React.FC = () => {
   const { theme, toggleTheme } = useTheme();
@@ -198,8 +196,6 @@ const Index: React.FC = () => {
           </div>
         </div>
       </section>
-
-      <Footer />
     </div>
   );
 };

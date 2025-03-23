@@ -1,8 +1,6 @@
-
 import React, { useState } from 'react';
 import { useTheme } from '@/components/ThemeProvider';
 import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
 import { BookOpen, ChevronRight, Search, CheckCircle, Filter, GraduationCap, Hand, Clock } from 'lucide-react';
 
 interface LessonCard {
@@ -274,8 +272,6 @@ const Learn: React.FC = () => {
           </div>
         </div>
       </main>
-
-      <Footer />
     </div>
   );
 };
