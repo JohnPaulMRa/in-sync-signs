@@ -166,9 +166,9 @@ const Translate: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <Navbar toggleTheme={toggleTheme} isDarkTheme={theme === 'dark'} />
 
-      <main className="flex-1 pt-20 pb-12">
+      <main className="flex-1 pt-16 pb-12">
         <div className="container mx-auto px-4 md:px-6">
-          <div className="max-w-5xl mx-auto">
+          <div className="max-w-6xl mx-auto">
             <div className="text-center mb-8 animate-fade-in">
               <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
                 ASL to Text Translator
@@ -178,10 +178,10 @@ const Translate: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
               {/* Left Panel - Camera */}
               <div className="animate-fade-in">
-                <div className="rounded-xl overflow-hidden border bg-card shadow-md relative aspect-video">
+                <div className="rounded-xl overflow-hidden border bg-card shadow-md relative h-[450px]">
                   {webcamActive ? (
                     <video 
                       ref={videoRef} 
@@ -250,7 +250,7 @@ const Translate: React.FC = () => {
 
               {/* Right Panel - Translated Text */}
               <div className="animate-fade-in">
-                <div className="rounded-xl border bg-card h-full shadow-md flex flex-col">
+                <div className="rounded-xl border bg-card h-[450px] shadow-md flex flex-col">
                   <div className="p-4 border-b flex justify-between items-center">
                     <h2 className="font-medium">Translated Text</h2>
                   </div>
