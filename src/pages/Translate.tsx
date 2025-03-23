@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, CameraOff, Copy, Volume2, RotateCcw, PauseCircle, Play, Loader } from 'lucide-react';
+import { Camera, CameraOff, Copy, Volume2, RotateCcw, PauseCircle, Play, Loader, SwitchCamera } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ const Translate: React.FC = () => {
   const [translatedText, setTranslatedText] = useState<string>('');
   const [copySuccess, setCopySuccess] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
 
@@ -26,7 +27,7 @@ const Translate: React.FC = () => {
         video: { 
           width: { ideal: 1280 },
           height: { ideal: 720 },
-          facingMode: 'user'
+          facingMode: facingMode
         } 
       });
       
@@ -50,6 +51,27 @@ const Translate: React.FC = () => {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const switchCamera = async () => {
+    // Stop the current stream
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => {
+        track.stop();
+      });
+    }
+    
+    // Toggle facing mode
+    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+    setFacingMode(newFacingMode);
+    
+    // Restart with new facing mode
+    setWebcamActive(false);
+    setTimeout(() => {
+      startWebcam();
+    }, 300);
+    
+    toast.info(`Switched to ${newFacingMode === 'user' ? 'front' : 'back'} camera`);
   };
 
   const stopWebcam = () => {
@@ -144,11 +166,11 @@ const Translate: React.FC = () => {
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <Navbar toggleTheme={toggleTheme} isDarkTheme={theme === 'dark'} />
 
-      <main className="flex-1 pt-32 pb-20">
+      <main className="flex-1 pt-20 pb-12">
         <div className="container mx-auto px-4 md:px-6">
           <div className="max-w-5xl mx-auto">
-            <div className="text-center mb-10 animate-fade-in">
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-4">
+            <div className="text-center mb-8 animate-fade-in">
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
                 ASL to Text Translator
               </h1>
               <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
@@ -156,10 +178,10 @@ const Translate: React.FC = () => {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-10">
               {/* Left Panel - Camera */}
               <div className="animate-fade-in">
-                <div className="rounded-lg overflow-hidden border bg-white shadow-md h-full flex flex-col items-center justify-center">
+                <div className="rounded-xl overflow-hidden border bg-card shadow-md relative aspect-video">
                   {webcamActive ? (
                     <video 
                       ref={videoRef} 
@@ -169,7 +191,7 @@ const Translate: React.FC = () => {
                       className="w-full h-full object-cover"
                     ></video>
                   ) : (
-                    <div className="flex flex-col items-center justify-center h-full py-20">
+                    <div className="flex flex-col items-center justify-center h-full py-16">
                       {isLoading ? (
                         <>
                           <Loader size={48} className="mx-auto mb-4 text-primary animate-spin" />
@@ -177,14 +199,15 @@ const Translate: React.FC = () => {
                         </>
                       ) : (
                         <>
-                          <p className="text-gray-500 text-lg mb-5">Webcam is off</p>
+                          <Camera size={64} className="mx-auto mb-4 text-primary/60" />
+                          <p className="text-muted-foreground text-lg mb-5">Camera is currently off</p>
                           <Button 
                             onClick={startWebcam}
                             disabled={isLoading}
-                            className="bg-blue-500 hover:bg-blue-600 text-white rounded-md py-2 px-4 flex items-center gap-2"
+                            className="bg-primary hover:bg-primary/90 text-white rounded-md py-2 px-4 flex items-center gap-2"
                           >
-                            <Camera size={16} />
-                            Start Webcam
+                            <Camera size={18} />
+                            Start Camera
                           </Button>
                         </>
                       )}
@@ -203,6 +226,15 @@ const Translate: React.FC = () => {
                         {isPaused ? <Play size={20} /> : <PauseCircle size={20} />}
                       </Button>
                       <Button 
+                        onClick={switchCamera}
+                        variant="secondary"
+                        size="icon"
+                        className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
+                        aria-label="Switch camera"
+                      >
+                        <SwitchCamera size={20} />
+                      </Button>
+                      <Button 
                         onClick={stopWebcam}
                         variant="secondary"
                         size="icon"
@@ -218,26 +250,27 @@ const Translate: React.FC = () => {
 
               {/* Right Panel - Translated Text */}
               <div className="animate-fade-in">
-                <div className="rounded-lg border bg-gray-50 h-full shadow-md flex flex-col">
+                <div className="rounded-xl border bg-card h-full shadow-md flex flex-col">
                   <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="font-medium text-gray-800">Translated Text</h2>
+                    <h2 className="font-medium">Translated Text</h2>
                   </div>
                   <div className="flex-1 p-4 overflow-auto">
                     {translatedText ? (
                       <p className="whitespace-pre-wrap break-words">{translatedText}</p>
                     ) : (
                       <div className="h-full flex items-center justify-center text-center">
-                        <p className="text-gray-500 bg-white rounded-lg p-4 w-full">
+                        <p className="text-muted-foreground bg-card rounded-lg p-4 w-full">
                           Enable your camera to start translating...
                         </p>
                       </div>
                     )}
                   </div>
-                  <div className="p-4 pt-0 flex justify-center gap-2">
+                  <div className="p-4 pt-0 flex flex-wrap justify-center gap-2">
                     <Button 
                       onClick={copyToClipboard}
                       disabled={!translatedText}
-                      className="bg-blue-500 hover:bg-blue-600 text-white rounded-md py-2 px-4 flex items-center gap-2"
+                      variant="default"
+                      className="rounded-md py-2 px-4 flex items-center gap-2"
                       aria-label="Copy to clipboard"
                     >
                       <Copy size={16} />
@@ -246,7 +279,8 @@ const Translate: React.FC = () => {
                     <Button 
                       onClick={speakText}
                       disabled={!translatedText}
-                      className="bg-blue-500 hover:bg-blue-600 text-white rounded-md py-2 px-4 flex items-center gap-2"
+                      variant="default"
+                      className="rounded-md py-2 px-4 flex items-center gap-2"
                       aria-label="Read aloud"
                     >
                       <Volume2 size={16} />
@@ -255,36 +289,28 @@ const Translate: React.FC = () => {
                     <Button 
                       onClick={resetTranslation}
                       disabled={!translatedText}
-                      className="bg-gray-500 hover:bg-gray-600 text-white rounded-md py-2 px-4 flex items-center gap-2"
+                      variant="outline"
+                      className="rounded-md py-2 px-4 flex items-center gap-2"
                       aria-label="Reset translation"
                     >
                       <RotateCcw size={16} />
                       Reset
                     </Button>
-                    {translatedText && (
-                      <Button 
-                        onClick={resetTranslation}
-                        className="bg-yellow-500 hover:bg-yellow-600 text-white rounded-md py-2 px-4"
-                        aria-label="Clear text"
-                      >
-                        Clear Text
-                      </Button>
-                    )}
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="bg-muted/30 rounded-2xl p-6 border animate-fade-in">
+            <div className="bg-muted/20 rounded-xl p-6 border animate-fade-in">
               <h2 className="text-xl font-semibold mb-4">How to use the translator</h2>
               <ol className="space-y-3 list-decimal pl-5">
-                <li>Click "Start Webcam" to allow access to your webcam</li>
+                <li>Click "Start Camera" to allow access to your webcam</li>
                 <li>Position yourself in the frame where your hand gestures are clearly visible</li>
                 <li>Start signing using American Sign Language (ASL)</li>
                 <li>Your signs will be translated to text in real-time in the panel on the right</li>
                 <li>Use the controls to copy, have the text read aloud, or reset the translation</li>
               </ol>
-              <div className="mt-4 p-4 bg-background rounded-lg border">
+              <div className="mt-4 p-4 bg-card rounded-lg border">
                 <p className="text-sm text-muted-foreground">
                   <strong>Note:</strong> For best results, ensure good lighting and a clear background. The translator works best with standard ASL signs.
                 </p>
