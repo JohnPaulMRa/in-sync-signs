@@ -1,5 +1,6 @@
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Camera, CameraOff, Copy, Volume2, Check, RotateCcw, PauseCircle, Play, Loader } from 'lucide-react';
+import { Camera, CameraOff, Copy, Volume2, RotateCcw, PauseCircle, Play, Loader } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import Navbar from '@/components/Navbar';
 import { Button } from '@/components/ui/button';
@@ -156,8 +157,9 @@ const Translate: React.FC = () => {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-12">
+              {/* Left Panel - Camera */}
               <div className="animate-fade-in">
-                <div className="rounded-2xl overflow-hidden border bg-muted/30 shadow-lg aspect-video relative">
+                <div className="rounded-lg overflow-hidden border bg-white shadow-md h-full flex flex-col items-center justify-center">
                   {webcamActive ? (
                     <video 
                       ref={videoRef} 
@@ -167,30 +169,25 @@ const Translate: React.FC = () => {
                       className="w-full h-full object-cover"
                     ></video>
                   ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <div className="text-center p-6">
-                        {isLoading ? (
-                          <>
-                            <Loader size={48} className="mx-auto mb-4 text-primary animate-spin" />
-                            <p className="text-muted-foreground mb-4">Connecting to camera...</p>
-                          </>
-                        ) : (
-                          <>
-                            <CameraOff size={48} className="mx-auto mb-4 text-muted-foreground" />
-                            <p className="text-muted-foreground mb-4">
-                              {cameraError || "Camera is currently disabled"}
-                            </p>
-                            <Button 
-                              onClick={startWebcam}
-                              disabled={isLoading}
-                              className="flex items-center gap-2"
-                            >
-                              <Camera size={16} />
-                              Enable Camera
-                            </Button>
-                          </>
-                        )}
-                      </div>
+                    <div className="flex flex-col items-center justify-center h-full py-20">
+                      {isLoading ? (
+                        <>
+                          <Loader size={48} className="mx-auto mb-4 text-primary animate-spin" />
+                          <p className="text-muted-foreground mb-4">Connecting to camera...</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-gray-500 text-lg mb-5">Webcam is off</p>
+                          <Button 
+                            onClick={startWebcam}
+                            disabled={isLoading}
+                            className="bg-blue-500 hover:bg-blue-600 text-white rounded-md py-2 px-4 flex items-center gap-2"
+                          >
+                            <Camera size={16} />
+                            Start Webcam
+                          </Button>
+                        </>
+                      )}
                     </div>
                   )}
 
@@ -219,54 +216,59 @@ const Translate: React.FC = () => {
                 </div>
               </div>
 
+              {/* Right Panel - Translated Text */}
               <div className="animate-fade-in">
-                <div className="rounded-2xl border bg-background h-full shadow-lg flex flex-col">
+                <div className="rounded-lg border bg-gray-50 h-full shadow-md flex flex-col">
                   <div className="p-4 border-b flex justify-between items-center">
-                    <h2 className="font-medium">Translated Text</h2>
-                    <div className="flex space-x-2">
-                      <Button 
-                        onClick={resetTranslation}
-                        disabled={!translatedText}
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full hover:bg-muted"
-                        aria-label="Reset translation"
-                      >
-                        <RotateCcw size={16} />
-                      </Button>
-                      <Button 
-                        onClick={speakText}
-                        disabled={!translatedText}
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full hover:bg-muted"
-                        aria-label="Read aloud"
-                      >
-                        <Volume2 size={16} />
-                      </Button>
-                      <Button 
-                        onClick={copyToClipboard}
-                        disabled={!translatedText}
-                        variant="ghost"
-                        size="icon"
-                        className="rounded-full hover:bg-muted"
-                        aria-label="Copy to clipboard"
-                      >
-                        {copySuccess ? <Check size={16} /> : <Copy size={16} />}
-                      </Button>
-                    </div>
+                    <h2 className="font-medium text-gray-800">Translated Text</h2>
                   </div>
                   <div className="flex-1 p-4 overflow-auto">
                     {translatedText ? (
                       <p className="whitespace-pre-wrap break-words">{translatedText}</p>
                     ) : (
                       <div className="h-full flex items-center justify-center text-center">
-                        <p className="text-muted-foreground">
-                          {webcamActive 
-                            ? "Start signing to see translation here..." 
-                            : "Enable your camera to start translating"}
+                        <p className="text-gray-500 bg-white rounded-lg p-4 w-full">
+                          Enable your camera to start translating...
                         </p>
                       </div>
+                    )}
+                  </div>
+                  <div className="p-4 pt-0 flex justify-center gap-2">
+                    <Button 
+                      onClick={copyToClipboard}
+                      disabled={!translatedText}
+                      className="bg-blue-500 hover:bg-blue-600 text-white rounded-md py-2 px-4 flex items-center gap-2"
+                      aria-label="Copy to clipboard"
+                    >
+                      <Copy size={16} />
+                      Copy
+                    </Button>
+                    <Button 
+                      onClick={speakText}
+                      disabled={!translatedText}
+                      className="bg-blue-500 hover:bg-blue-600 text-white rounded-md py-2 px-4 flex items-center gap-2"
+                      aria-label="Read aloud"
+                    >
+                      <Volume2 size={16} />
+                      Speak
+                    </Button>
+                    <Button 
+                      onClick={resetTranslation}
+                      disabled={!translatedText}
+                      className="bg-gray-500 hover:bg-gray-600 text-white rounded-md py-2 px-4 flex items-center gap-2"
+                      aria-label="Reset translation"
+                    >
+                      <RotateCcw size={16} />
+                      Reset
+                    </Button>
+                    {translatedText && (
+                      <Button 
+                        onClick={resetTranslation}
+                        className="bg-yellow-500 hover:bg-yellow-600 text-white rounded-md py-2 px-4"
+                        aria-label="Clear text"
+                      >
+                        Clear Text
+                      </Button>
                     )}
                   </div>
                 </div>
@@ -276,7 +278,7 @@ const Translate: React.FC = () => {
             <div className="bg-muted/30 rounded-2xl p-6 border animate-fade-in">
               <h2 className="text-xl font-semibold mb-4">How to use the translator</h2>
               <ol className="space-y-3 list-decimal pl-5">
-                <li>Click "Enable Camera" to allow access to your webcam</li>
+                <li>Click "Start Webcam" to allow access to your webcam</li>
                 <li>Position yourself in the frame where your hand gestures are clearly visible</li>
                 <li>Start signing using American Sign Language (ASL)</li>
                 <li>Your signs will be translated to text in real-time in the panel on the right</li>
