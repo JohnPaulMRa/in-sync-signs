@@ -20,6 +20,14 @@ const badgeVariants = cva(
           "border-transparent bg-accent text-accent-foreground hover:bg-accent/80",
         success:
           "border-transparent bg-emerald-500 text-white hover:bg-emerald-500/80",
+        teal:
+          "border-transparent bg-teal text-white hover:bg-teal/80",
+        charcoal:
+          "border-transparent bg-charcoal text-white hover:bg-charcoal/80",
+        mediumgray:
+          "border-transparent bg-mediumgray text-white hover:bg-mediumgray/80",
+        lightgray:
+          "border-transparent bg-lightgray text-charcoal hover:bg-lightgray/80",
       },
     },
     defaultVariants: {

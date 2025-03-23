@@ -24,6 +24,13 @@ export default {
         serif: ["Georgia", "serif"],
       },
       colors: {
+        // Custom color palette based on the provided image
+        charcoal: "#252525",
+        mediumgray: "#8D9192", 
+        lightgray: "#EDEDED",
+        purewhite: "#FFFFFF",
+        teal: "#1D809A",
+        
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
