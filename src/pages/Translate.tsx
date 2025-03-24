@@ -24,6 +24,10 @@ const Translate: React.FC = () => {
   // Add a ref for the text container
   const translationContainerRef = useRef<HTMLDivElement>(null);
 
+  // Add these to your existing state variables
+  const [backendConnected, setBackendConnected] = useState(false);
+  const eventSourceRef = useRef<EventSource | null>(null);
+
   const checkCameraPermission = async () => {
     try {
       const result = await navigator.permissions.query({ name: "camera" as PermissionName });
@@ -59,6 +63,21 @@ const Translate: React.FC = () => {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       setCameraError("Your browser doesn't support webcam access. Try using Chrome, Firefox, or Edge.");
     }
+  }, []);
+
+  // Consolidate the backend connection logic
+  useEffect(() => {
+    // Check if backend is running on component mount
+    fetch('http://localhost:5000/health')
+      .then(res => res.json())
+      .then(() => {
+        setBackendConnected(true);
+        toast.success("ASL backend connected");
+      })
+      .catch(() => {
+        setBackendConnected(false);
+        toast.error("ASL backend not available - please start the backend server");
+      });
   }, []);
 
   const startWebcam = useCallback(async (customFacingMode?: 'user' | 'environment') => {
@@ -268,48 +287,21 @@ const Translate: React.FC = () => {
     }
   };
 
+  // Reset translation with proper error handling
   const resetTranslation = () => {
     setTranslatedText('');
-    toast.info("Translation reset");
-  };
-
-  useEffect(() => {
-    if (!webcamActive) return;
     
-    const phrases = [
-      "Hello, how are you?",
-      "My name is John",
-      "Nice to meet you",
-      "Thank you for your help",
-      "I am learning sign language",
-      "Can you help me?",
-      "I understand",
-      "I don't understand",
-      "Please repeat that",
-      "Good morning"
-    ];
-    
-    // Only simulate in development mode
-    if (process.env.NODE_ENV === 'development') {
-      console.log("🔄 Starting translation simulation");
-      const interval = setInterval(() => {
-        if (!isPaused && webcamActive) {
-          setTranslatedText(current => {
-            const newPhrase = phrases[translationIndexRef.current % phrases.length];
-            translationIndexRef.current++;
-            return current ? `${current} ${newPhrase}` : newPhrase;
-          });
-        }
-      }, SIMULATED_TRANSLATION_INTERVAL);
-      
-      return () => {
-        console.log("🛑 Cleaning up translation simulation");
-        clearInterval(interval);
-      };
+    if (backendConnected) {
+      fetch('http://localhost:5000/reset', { method: 'POST' })
+        .then(() => toast.info("Translation reset"))
+        .catch(err => {
+          console.error("Reset error:", err);
+          toast.error("Failed to reset translation on server");
+        });
+    } else {
+      toast.info("Translation reset");
     }
-    
-    return () => {}; // Empty cleanup for production mode
-  }, [webcamActive, isPaused]);
+  };
 
   // Add this useEffect to handle scrolling
   useEffect(() => {
@@ -400,6 +392,83 @@ const Translate: React.FC = () => {
       startWebcam().catch((err) => console.error("Error starting webcam:", err));
     }
   }, [webcamActive, startWebcam]);
+
+  // Improved SSE connection with single event source
+  useEffect(() => {
+    if (!webcamActive || !backendConnected) return;
+    
+    // Create a single event source
+    const eventSource = new EventSource('http://localhost:5000/events');
+    eventSourceRef.current = eventSource;
+    
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        setTranslatedText(data.message);
+      } catch (err) {
+        console.error("Error processing message:", err);
+      }
+    };
+    
+    eventSource.onerror = () => {
+      console.error("SSE connection error");
+      toast.error("Connection to ASL server lost");
+      eventSource.close();
+    };
+    
+    // Clean up properly on unmount or when webcam deactivated
+    return () => {
+      console.log("Closing SSE connection");
+      eventSource.close();
+      eventSourceRef.current = null;
+    };
+  }, [webcamActive, backendConnected]);
+
+  const captureAndSendImage = useCallback(async () => {
+    if (!webcamActive || !backendConnected) return;
+    
+    try {
+      // Create a hidden canvas element
+      const canvas = document.createElement('canvas');
+      const video = videoRef.current;
+      
+      if (!video) return;
+      
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      
+      // Draw current video frame to canvas
+      const ctx = canvas.getContext('2d');
+      ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      // Get base64 image data
+      const imageData = canvas.toDataURL('image/jpeg', 0.7);
+      
+      // Send to backend
+      const response = await fetch('http://localhost:5000/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ image: imageData })
+      });
+      
+      if (!response.ok) throw new Error('Failed to get prediction');
+      
+      const data = await response.json();
+      if (data.prediction) {
+        setTranslatedText(prev => prev + data.prediction);
+      }
+    } catch (err) {
+      console.error('Error capturing or sending image:', err);
+    }
+  }, [webcamActive, backendConnected]);
+
+  // Add interval to periodically capture and send
+  useEffect(() => {
+    if (!webcamActive || !backendConnected) return;
+    
+    const interval = setInterval(captureAndSendImage, 1000);
+    return () => clearInterval(interval);
+  }, [webcamActive, backendConnected, captureAndSendImage]);
 
   type ActionButtonProps = {
     onClick: () => void;
