@@ -1,5 +1,4 @@
-
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Camera, CameraOff, Copy, Volume2, RotateCcw, PauseCircle, Play, Loader, SwitchCamera } from 'lucide-react';
 import { useTheme } from '@/components/ThemeProvider';
 import Navbar from '@/components/Navbar';
@@ -17,86 +16,208 @@ const Translate: React.FC = () => {
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  const [autoStart, setAutoStart] = useState(false);
 
-  const startWebcam = async () => {
+  const SIMULATED_TRANSLATION_INTERVAL = 5000;
+  const translationIndexRef = useRef(0);
+
+  // Add a ref for the text container
+  const translationContainerRef = useRef<HTMLDivElement>(null);
+
+  const checkCameraPermission = async () => {
+    try {
+      const result = await navigator.permissions.query({ name: "camera" as PermissionName });
+      console.log("Camera permission status:", result.state);
+      
+      if (result.state === "denied") {
+        setCameraError("Camera access is blocked. Please change your browser settings to allow camera access.");
+        toast.error("Camera access blocked by browser settings", {
+          duration: 6000,
+          action: {
+            label: "Help",
+            onClick: () => window.open("https://support.google.com/chrome/answer/2693767", "_blank")
+          }
+        });
+        return false;
+      } else if (result.state === "prompt") {
+        console.log("Camera permission will be requested when needed");
+        return null; // Undetermined
+      }
+      
+      return true; // Granted
+    } catch (err) {
+      console.error("Permission API not supported:", err);
+      return null; // Unknown
+    }
+  };
+
+  useEffect(() => {
+    checkCameraPermission().then(status => {
+      console.log("Initial camera permission:", status);
+    });
+    
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      setCameraError("Your browser doesn't support webcam access. Try using Chrome, Firefox, or Edge.");
+    }
+  }, []);
+
+  const startWebcam = useCallback(async (customFacingMode?: 'user' | 'environment') => {
+    const mode = customFacingMode || facingMode;
+    
+    try {
+      // Check if a previous stream exists and stop it
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
+      
+      // Set loading state
+      setIsLoading(true);
+      setCameraError(null);
+      
+      // Request camera access
+      console.log(`🎥 Requesting camera access with mode: ${mode}`);
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { 
+          facingMode: mode,
+          width: { ideal: 1280 },
+          height: { ideal: 720 }
+        },
+      });
+      console.log("✅ Webcam stream obtained:", stream);
+
+      // Store the stream in ref for later use
+      streamRef.current = stream;
+
+      if (videoRef.current) {
+        console.log("✅ Video element found, assigning stream");
+        
+        // Assign stream to video element
+        videoRef.current.srcObject = stream;
+        
+        // Setup metadata loading and playback
+        videoRef.current.onloadedmetadata = () => {
+          console.log("🎬 Video metadata loaded, attempting playback");
+          
+          videoRef.current
+            ?.play()
+            .then(() => {
+              console.log("🎥 Video playback started successfully");
+              setWebcamActive(true);
+              setIsPaused(false);
+              setCameraError(null);
+              toast.success("Camera connected");
+            })
+            .catch((err) => {
+              console.error("❌ Video playback error:", err);
+              toast.error("Video playback failed. Try refreshing the page.");
+              setCameraError("Could not play video stream. Try refreshing the page.");
+            });
+        };
+        
+        // Add error handler
+        videoRef.current.onerror = (event) => {
+          console.error("❌ Video element error:", event);
+          setCameraError("Video element encountered an error");
+        };
+      } else {
+        console.error("❌ Video element is missing. videoRef.current is null.");
+        toast.error("Video element not found");
+        setCameraError("Internal error: Video element not found");
+      }
+    } catch (err: unknown) {
+      // Detailed error handling
+      if (err instanceof DOMException) {
+        if (err.name === 'NotAllowedError') {
+          console.error("❌ Camera access denied by user");
+          setCameraError("Camera access was denied. Please allow camera access in your browser settings.");
+          toast.error("Camera permission denied");
+        } else if (err.name === 'NotFoundError') {
+          console.error("❌ No camera found");
+          setCameraError("No camera was found on your device.");
+          toast.error("No camera detected");
+        } else {
+          console.error(`❌ DOM Exception: ${err.name}`, err);
+          setCameraError(`Camera error: ${err.message}`);
+          toast.error("Camera error occurred");
+        }
+      } else {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+        console.error("❌ Error starting webcam:", errorMessage);
+        setCameraError(`Could not access webcam: ${errorMessage}`);
+        toast.error("Failed to start webcam");
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  }, [facingMode]);
+
+  const switchCamera = async () => {
     setIsLoading(true);
     setCameraError(null);
     
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { 
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
-          facingMode: facingMode
-        } 
-      });
-      
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        streamRef.current = stream;
-        setWebcamActive(true);
-        setIsPaused(false);
-        toast.success("Camera connected successfully");
-        simulateTranslation();
+      // Stop current tracks
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
       }
+      
+      // Toggle facing mode
+      const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
+      setFacingMode(newFacingMode);
+      
+      // Temporary disable webcam active state
+      setWebcamActive(false);
+      
+      // Short delay for cleanup
+      await new Promise(resolve => setTimeout(resolve, 300));
+      
+      // Re-enable webcam with new facing mode
+      setWebcamActive(true);
+      
+      toast.success(`Switching to ${newFacingMode === 'user' ? 'front' : 'back'} camera`);
     } catch (err) {
-      console.error("Error accessing webcam:", err);
-      const errorMsg = err instanceof Error ? err.message : "Unknown error";
-      setCameraError(
-        errorMsg.includes("Permission denied") 
-          ? "Camera access was denied. Please allow camera access in your browser settings."
-          : "Couldn't connect to your camera. Please make sure it's connected and working properly."
-      );
-      toast.error("Camera connection failed");
+      const errorMessage = err instanceof Error ? err.message : "Unknown error";
+      setCameraError(`Failed to switch camera: ${errorMessage}`);
+      toast.error("Camera switching failed");
     } finally {
       setIsLoading(false);
     }
   };
 
-  const switchCamera = async () => {
-    // Stop the current stream
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
-      });
-    }
-    
-    // Toggle facing mode
-    const newFacingMode = facingMode === 'user' ? 'environment' : 'user';
-    setFacingMode(newFacingMode);
-    
-    // Restart with new facing mode
-    setWebcamActive(false);
-    setTimeout(() => {
-      startWebcam();
-    }, 300);
-    
-    toast.info(`Switched to ${newFacingMode === 'user' ? 'front' : 'back'} camera`);
-  };
-
   const stopWebcam = () => {
-    if (streamRef.current) {
-      streamRef.current.getTracks().forEach(track => {
-        track.stop();
-      });
-      streamRef.current = null;
-      setWebcamActive(false);
-      setTranslatedText('');
-      toast.info("Camera disconnected");
+    setWebcamActive(false); // This will trigger the cleanup in the first useEffect
+    
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
     }
+    
+    setTranslatedText('');
+    toast.info("Camera disconnected");
   };
 
   const togglePause = () => {
-    setIsPaused(!isPaused);
-    if (videoRef.current) {
-      if (!isPaused) {
-        videoRef.current.pause();
-        toast.info("Video paused");
-      } else {
-        videoRef.current.play();
-        toast.info("Video resumed");
+    setIsPaused(prev => {
+      const newPauseState = !prev;
+      
+      if (videoRef.current) {
+        try {
+          if (newPauseState) {
+            videoRef.current.pause();
+            toast.info("Video paused");
+          } else {
+            videoRef.current.play()
+              .then(() => console.log("▶️ Video resumed"))
+              .catch(err => console.error("❌ Error resuming video:", err));
+            toast.info("Video resumed");
+          }
+        } catch (err) {
+          console.error("Error toggling video playback:", err);
+        }
       }
-    }
+      
+      return newPauseState;
+    });
   };
 
   const copyToClipboard = () => {
@@ -115,10 +236,35 @@ const Translate: React.FC = () => {
   };
 
   const speakText = () => {
-    if (translatedText && 'speechSynthesis' in window) {
-      const utterance = new SpeechSynthesisUtterance(translatedText);
-      window.speechSynthesis.speak(utterance);
-      toast.info("Speaking text");
+    if (!translatedText) return;
+    
+    if ('speechSynthesis' in window) {
+      try {
+        // Cancel any ongoing speech
+        window.speechSynthesis.cancel();
+        
+        const utterance = new SpeechSynthesisUtterance(translatedText);
+        // Set preferred voice and settings
+        utterance.rate = 0.9; // Slightly slower for clarity
+        utterance.pitch = 1.0;
+        
+        // Add start/end event handlers for better UX
+        utterance.onstart = () => {
+          console.log("🔊 Speech started");
+        };
+        
+        utterance.onend = () => {
+          console.log("🔊 Speech completed");
+        };
+        
+        window.speechSynthesis.speak(utterance);
+        toast.info("Speaking text");
+      } catch (err) {
+        console.error("Speech synthesis failed:", err);
+        toast.error("Failed to speak text");
+      }
+    } else {
+      toast.error("Speech synthesis is not supported in this browser");
     }
   };
 
@@ -127,7 +273,9 @@ const Translate: React.FC = () => {
     toast.info("Translation reset");
   };
 
-  const simulateTranslation = () => {
+  useEffect(() => {
+    if (!webcamActive) return;
+    
     const phrases = [
       "Hello, how are you?",
       "My name is John",
@@ -141,20 +289,35 @@ const Translate: React.FC = () => {
       "Good morning"
     ];
     
-    let index = 0;
+    // Only simulate in development mode
+    if (process.env.NODE_ENV === 'development') {
+      console.log("🔄 Starting translation simulation");
+      const interval = setInterval(() => {
+        if (!isPaused && webcamActive) {
+          setTranslatedText(current => {
+            const newPhrase = phrases[translationIndexRef.current % phrases.length];
+            translationIndexRef.current++;
+            return current ? `${current} ${newPhrase}` : newPhrase;
+          });
+        }
+      }, SIMULATED_TRANSLATION_INTERVAL);
+      
+      return () => {
+        console.log("🛑 Cleaning up translation simulation");
+        clearInterval(interval);
+      };
+    }
     
-    const interval = setInterval(() => {
-      if (!isPaused && webcamActive) {
-        setTranslatedText(current => {
-          const newPhrase = phrases[index % phrases.length];
-          index++;
-          return current ? `${current} ${newPhrase}` : newPhrase;
-        });
-      }
-    }, 5000);
-    
-    return () => clearInterval(interval);
-  };
+    return () => {}; // Empty cleanup for production mode
+  }, [webcamActive, isPaused]);
+
+  // Add this useEffect to handle scrolling
+  useEffect(() => {
+    if (translationContainerRef.current && translatedText) {
+      // Scroll to bottom when text changes
+      translationContainerRef.current.scrollTop = translationContainerRef.current.scrollHeight;
+    }
+  }, [translatedText]);
 
   useEffect(() => {
     return () => {
@@ -162,89 +325,173 @@ const Translate: React.FC = () => {
     };
   }, []);
 
+  useEffect(() => {
+    if (autoStart) {
+      startWebcam().catch((err) => console.error("Error starting webcam:", err));
+      setAutoStart(false); // Reset flag after starting
+    }
+  }, [autoStart, startWebcam]);
+
+  // 1. First effect: Get the media stream
+  useEffect(() => {
+    // Only attempt to get stream when user clicks the button (controlled by webcamActive)
+    if (!webcamActive) return;
+    
+    const acquireMediaStream = async () => {
+      try {
+        setIsLoading(true);
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { facingMode },
+        });
+        console.log("✅ Webcam stream obtained:", stream);
+        streamRef.current = stream;
+        setCameraError(null);
+      } catch (err: unknown) {
+        const errorMessage = err instanceof Error ? err.message : "Unknown error occurred";
+        console.error("❌ Error starting webcam:", errorMessage);
+        setCameraError("Could not access webcam. Please check permissions.");
+        toast.error("Failed to start webcam");
+        setWebcamActive(false); // Reset state on error
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    acquireMediaStream();
+    
+    // Cleanup function
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [webcamActive, facingMode]);
+  
+  // 2. Second effect: Assign stream to video element
+  useEffect(() => {
+    if (!streamRef.current || !videoRef.current) return;
+    
+    console.log("✅ Assigning stream to video element");
+    videoRef.current.srcObject = streamRef.current;
+    
+    const handleCanPlay = () => {
+      console.log("🎥 Video can play now");
+      videoRef.current?.play()
+        .then(() => {
+          console.log("🎥 Video playback started");
+          setIsPaused(false);
+        })
+        .catch(err => {
+          console.error("❌ Video playback error:", err);
+          toast.error("Video playback failed");
+        });
+    };
+    
+    const videoElement = videoRef.current;
+    videoElement?.addEventListener('loadedmetadata', handleCanPlay);
+    
+    return () => {
+      videoElement?.removeEventListener('loadedmetadata', handleCanPlay);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (webcamActive) {
+      startWebcam().catch((err) => console.error("Error starting webcam:", err));
+    }
+  }, [webcamActive, startWebcam]);
+
+  type ActionButtonProps = {
+    onClick: () => void;
+    disabled?: boolean;
+    icon: React.ReactNode;
+    label: string;
+    variant?: "default" | "outline" | "secondary";
+    ariaLabel?: string;
+  };
+  
+  const ActionButton: React.FC<ActionButtonProps> = ({
+    onClick,
+    disabled = false,
+    icon,
+    label,
+    variant = "default",
+    ariaLabel,
+  }) => (
+    <Button
+      onClick={onClick}
+      disabled={disabled}
+      variant={variant}
+      className="rounded-md py-2 px-4 flex items-center gap-2"
+      aria-label={ariaLabel || label}
+    >
+      {icon}
+      {label}
+    </Button>
+  );
+
+  const CameraControls: React.FC = () => (
+    <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-2 z-10">
+      {webcamActive ? (
+        <>
+          {/* Controls when camera is active */}
+          <Button onClick={togglePause}>
+            {isPaused ? <Play size={20} /> : <PauseCircle size={20} />}
+          </Button>
+          <Button onClick={switchCamera}>
+            <SwitchCamera size={20} />
+          </Button>
+          <Button onClick={stopWebcam}>
+            <CameraOff size={20} />
+          </Button>
+        </>
+      ) : (
+        // START CAMERA BUTTON IS HERE
+        <Button
+          onClick={() => setWebcamActive(true)}
+          className="bg-primary hover:bg-primary/90 text-white rounded-full px-4 py-2 flex items-center gap-2"
+          disabled={isLoading}
+          aria-label="Start camera"
+        >
+          {isLoading ? <Loader className="animate-spin" size={18} /> : <Camera size={18} />}
+          {isLoading ? "Connecting..." : "Start Camera"}
+        </Button>
+      )}
+    </div>
+  );
+
   return (
     <div className="min-h-screen flex flex-col bg-background text-foreground">
       <Navbar toggleTheme={toggleTheme} isDarkTheme={theme === 'dark'} />
 
       <main className="flex-1 pt-16 pb-12">
-        <div className="container mx-auto px-4 md:px-6">
+        <div className="container mx-auto px-4 md:px-6"></div>
           <div className="max-w-6xl mx-auto">
             <div className="text-center mb-8 animate-fade-in">
-              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-3">
-                ASL to Text Translator
-              </h1>
-              <p className="text-lg text-muted-foreground max-w-3xl mx-auto">
-                Enable your camera and start signing. Our technology will translate your gestures into text in real-time.
-              </p>
-            </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-10">
               {/* Left Panel - Camera */}
               <div className="animate-fade-in">
                 <div className="rounded-xl overflow-hidden border bg-card shadow-md relative h-[450px]">
-                  {webcamActive ? (
-                    <video 
-                      ref={videoRef} 
-                      autoPlay 
-                      muted 
-                      playsInline
-                      className="w-full h-full object-cover"
-                    ></video>
-                  ) : (
-                    <div className="flex flex-col items-center justify-center h-full py-16">
-                      {isLoading ? (
-                        <>
-                          <Loader size={48} className="mx-auto mb-4 text-primary animate-spin" />
-                          <p className="text-muted-foreground mb-4">Connecting to camera...</p>
-                        </>
-                      ) : (
-                        <>
-                          <Camera size={64} className="mx-auto mb-4 text-primary/60" />
-                          <p className="text-muted-foreground text-lg mb-5">Camera is currently off</p>
-                          <Button 
-                            onClick={startWebcam}
-                            disabled={isLoading}
-                            className="bg-primary hover:bg-primary/90 text-white rounded-md py-2 px-4 flex items-center gap-2"
-                          >
-                            <Camera size={18} />
-                            Start Camera
-                          </Button>
-                        </>
-                      )}
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className={`w-full h-full object-cover ${!webcamActive ? 'hidden' : ''}`}
+                  />
+                  
+                  {cameraError && (
+                    <div className="absolute inset-0 bg-black/70 flex items-center justify-center text-center p-6">
+                      <div className="bg-card p-4 rounded-lg max-w-md">
+                        <CameraOff className="mx-auto mb-4 text-red-500" size={32} />
+                        <p className="text-red-500 font-semibold mb-2">Camera Error</p>
+                        <p className="text-sm text-muted-foreground">{cameraError}</p>
+                      </div>
                     </div>
                   )}
-
-                  {webcamActive && (
-                    <div className="absolute bottom-4 left-0 right-0 flex justify-center space-x-3">
-                      <Button 
-                        onClick={togglePause}
-                        variant="secondary"
-                        size="icon"
-                        className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
-                        aria-label={isPaused ? "Resume" : "Pause"}
-                      >
-                        {isPaused ? <Play size={20} /> : <PauseCircle size={20} />}
-                      </Button>
-                      <Button 
-                        onClick={switchCamera}
-                        variant="secondary"
-                        size="icon"
-                        className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
-                        aria-label="Switch camera"
-                      >
-                        <SwitchCamera size={20} />
-                      </Button>
-                      <Button 
-                        onClick={stopWebcam}
-                        variant="secondary"
-                        size="icon"
-                        className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background"
-                        aria-label="Stop camera"
-                      >
-                        <CameraOff size={20} />
-                      </Button>
-                    </div>
-                  )}
+                  
+                  <CameraControls />
                 </div>
               </div>
 
@@ -254,7 +501,10 @@ const Translate: React.FC = () => {
                   <div className="p-4 border-b flex justify-between items-center">
                     <h2 className="font-medium">Translated Text</h2>
                   </div>
-                  <div className="flex-1 p-4 overflow-auto">
+                  <div 
+                    ref={translationContainerRef} 
+                    className="flex-1 p-4 overflow-auto"
+                  >
                     {translatedText ? (
                       <p className="whitespace-pre-wrap break-words">{translatedText}</p>
                     ) : (
@@ -266,36 +516,25 @@ const Translate: React.FC = () => {
                     )}
                   </div>
                   <div className="p-4 pt-0 flex flex-wrap justify-center gap-2">
-                    <Button 
+                    <ActionButton
                       onClick={copyToClipboard}
                       disabled={!translatedText}
-                      variant="default"
-                      className="rounded-md py-2 px-4 flex items-center gap-2"
-                      aria-label="Copy to clipboard"
-                    >
-                      <Copy size={16} />
-                      Copy
-                    </Button>
-                    <Button 
+                      icon={<Copy size={16} />}
+                      label="Copy"
+                    />
+                    <ActionButton
                       onClick={speakText}
                       disabled={!translatedText}
-                      variant="default"
-                      className="rounded-md py-2 px-4 flex items-center gap-2"
-                      aria-label="Read aloud"
-                    >
-                      <Volume2 size={16} />
-                      Speak
-                    </Button>
-                    <Button 
+                      icon={<Volume2 size={16} />}
+                      label="Speak"
+                    />
+                    <ActionButton
                       onClick={resetTranslation}
                       disabled={!translatedText}
+                      icon={<RotateCcw size={16} />}
+                      label="Reset"
                       variant="outline"
-                      className="rounded-md py-2 px-4 flex items-center gap-2"
-                      aria-label="Reset translation"
-                    >
-                      <RotateCcw size={16} />
-                      Reset
-                    </Button>
+                    />
                   </div>
                 </div>
               </div>
@@ -324,3 +563,4 @@ const Translate: React.FC = () => {
 };
 
 export default Translate;
+

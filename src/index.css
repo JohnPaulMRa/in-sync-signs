@@ -202,6 +202,16 @@
   opacity: 1;
 }
 
+.webcam-wrapper video {
+  width: 100%;
+  max-width: 480px;
+  height: auto;
+  border: 2px solid #444;
+  border-radius: 10px;
+  margin-bottom: 10px;
+  background-color: #000; /* Ensure a black background for better visibility */
+}
+
 .page-transition-enter {
   opacity: 0;
   transform: translateY(20px);
